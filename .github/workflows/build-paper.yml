@@ -20,5 +20,9 @@ jobs:
         run: mvn -B --no-transfer-progress clean package
       - uses: actions/upload-artifact@v4
         with:
-          name: LostCityNavigator-0.9.2-Paper-1.21.8
-          path: target/LostCityNavigator-0.9.2.jar
+          name: LostCityNavigator-Paper-1.21.8
+          path: |
+            target/*.jar
+            !target/*-sources.jar
+            !target/*-javadoc.jar
+          if-no-files-found: error
