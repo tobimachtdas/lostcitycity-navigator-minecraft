@@ -36,3 +36,14 @@ Die JAR wird gegen die **echte Paper 1.21.8 API** gebaut; keine nachgebauten Buk
 ## Sicherheit
 
 Das Plugin ist nur für deine eigene oder ausdrücklich freigegebene Serverwelt vorgesehen. Private Ziele werden normalen Spielern nicht angezeigt und Standardspieler dürfen sich nicht teleportieren. Vor dem ersten Test Serverbackup anfertigen. Wenn du andere Scoreboard-Plugins verwendest, blendet der Navigator seine Sidebar zurückhaltend aus, statt deren Anzeige zu überschreiben.
+
+
+---
+
+## Desktop-App: Lost City Finder
+
+Die lokale Desktop-App mit Welt-Scanner, Fernsuche, Geländekarte und Export liegt jetzt unter **[desktop-app/](desktop-app/)**. Eine echte Vorschau und die Start-/Build-Anleitung findest du dort.
+
+![Lost City Finder Desktop-App](desktop-app/docs/screenshot.jpg)
+
+Projektidee und Creator: **[tobimachtdas](https://www.youtube.com/@tobimachtdas)**.
