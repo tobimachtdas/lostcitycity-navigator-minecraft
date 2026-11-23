@@ -72,16 +72,36 @@ Auf meinem Kanal kannst du verfolgen, wie ich neue Software-Ideen umsetze. Ich m
 
 **Hinweis:** Die Liste in der rechten Sidebar dient nur zur Übersicht. Einträge einer Minecraft-Scoreboard-Sidebar sind nicht anklickbar. Fundorte wechselst du mit dem Navigator-Menü bzw. den Befehlen.
 
-## Paper-JAR über GitHub Actions bauen
+## 📥 Fertige Plugin-JAR herunterladen und installieren
 
-1. ZIP entpacken.
-2. Inhalt ins bestehende GitHub-Repository hochladen und die Dateien `pom.xml`, `src/main/java/de/lostcity/LostCityNavigator.java`, `src/main/resources/plugin.yml` und `.github/workflows/build-paper.yml` ersetzen; `src/main/resources/config.yml` hinzufügen. Der Inhalt muss **direkt im Repo-Stamm** liegen.
-3. Nach dem Commit **Actions → Build Lost City Navigator (Paper 1.21.8)** öffnen.
-4. Den erfolgreichen Lauf öffnen und unter **Artifacts** die JAR herunterladen.
-5. Auf einer Testkopie des Paper-Servers alte Navigator-JAR entfernen, neue JAR installieren und Server neu starten.
-6. Bereits vorhandene `plugins/LostCityNavigator/locations.json` und deine Fundortdaten beibehalten.
+**Du musst das Plugin nicht selbst kompilieren und auch keine GitHub Actions starten.** Die fertige JAR-Datei liegt direkt in diesem Repository:
 
-Die JAR wird gegen die **echte Paper 1.21.8 API** gebaut; keine nachgebauten Bukkit-Stubs. Der Build ist hier nicht ausgeführt worden, da die Paper-API / Maven in dieser Laufzeit nicht verfügbar sind. Ein echter Paper-Servertest steht ebenfalls noch aus.
+👉 **[LostCityNavigator-0.9.3.jar herunterladen](LostCityNavigator-0.9.3.jar)** · [GitHub-Dateiansicht](https://github.com/tobimachtdas/lostcitycity-navigator-minecraft/blob/main/LostCityNavigator-0.9.3.jar)
+
+### Installation auf deinem Minecraft-Server
+
+1. Verwende einen **Paper-Server mit Minecraft Java 1.21.8**. Diese Kombination wurde bisher praktisch getestet; andere Versionen sind noch nicht verifiziert. **Vanilla** unterstützt dieses Plugin nicht.
+2. Erstelle vorsichtshalber ein Backup deiner Serverwelt und **stoppe den Server**.
+3. Lade die JAR herunter (auf der GitHub-Dateiseite gegebenenfalls **Download raw file** anklicken).
+4. Kopiere `LostCityNavigator-0.9.3.jar` in den Ordner `plugins/` deines Paper-Servers.
+5. Falls du ältere LostCityNavigator-JAR-Dateien hast, entferne sie aus `plugins/`, damit nicht mehrere Versionen gleichzeitig geladen werden.
+6. Starte den Server neu. Prüfe in der Konsole, ob **LostCityNavigator** ohne Fehlermeldung aktiviert wurde.
+7. Nutze im Spiel `/lostcity compass`, um den Navigator zu erhalten.
+
+### Eigene Fundorte aus der Desktop-App importieren
+
+1. Scanne deine Minecraft-Welt mit **[Lost City Finder](desktop-app/)**.
+2. Exportiere deine gefundenen Orte als `locations.json`.
+3. Kopiere die Datei nach `plugins/LostCityNavigator/locations.json` auf deinem Server (den Plugin-Ordner gegebenenfalls nach dem ersten Start erstellen lassen).
+4. Gib als Administrator **`/lostcity reload`** ein.
+5. Öffne mit dem Spezialkompass per Rechtsklick oder über `/lostcity list` die Fundortauswahl.
+
+**Privatsphäre:** Importierte Ziele sind nicht automatisch für alle Spieler freigegeben. Teleportieren dürfen standardmäßig nur OPs beziehungsweise Spieler mit `lostcity.teleport`. Der Teleportpunkt ist nicht garantiert ungefährlich – teste dies zuerst auf einer Serverkopie.
+
+### Für Entwickler (optional)
+
+Wer den Quellcode verändern möchte, kann mit Java 21 und Maven `mvn clean package` ausführen oder den GitHub-Actions-Workflow **Build Lost City Navigator (Paper 1.21.8)** verwenden. Für die normale Installation ist das **nicht erforderlich**.
+
 
 ## Sicherheit
 
