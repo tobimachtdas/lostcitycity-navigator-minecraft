@@ -1,18 +1,21 @@
 name: LostCityNavigator
-version: 0.9.2
+version: 0.9.3
 main: de.lostcity.LostCityNavigator
 api-version: '1.21'
 author: tobimachtdas
 website: https://www.youtube.com/@tobimachtdas
-description: Navigator for private and administrator-approved Lost City Finder discoveries.
+description: Lost City Finder compass, right sidebar and permission-gated teleport.
 commands:
   lostcity:
-    description: Get a navigator compass or list/reload locations
-    usage: /lostcity [compass|list|reload]
+    description: Navigator, targets, sidebar and teleport
+    usage: /lostcity [compass|list|map|next|prev|tp|reload]
 permissions:
   lostcity.use:
-    description: Use the navigator
+    description: Use the navigator and sidebar
     default: true
   lostcity.admin:
-    description: View and reload private locations
+    description: View private destinations and reload locations
+    default: op
+  lostcity.teleport:
+    description: Teleport to an approved selected destination
     default: op

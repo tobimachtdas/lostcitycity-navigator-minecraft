@@ -1,0 +1,10 @@
+# Right-side target overview. Does not override another plugin's custom scoreboard.
+sidebar:
+  enabled-by-default: true
+teleport:
+  enabled: true
+# Optional explicit world mapping, especially when multiple overworlds are installed.
+worlds:
+  overworld: ''
+  nether: ''
+  end: ''
