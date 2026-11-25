@@ -1,5 +1,5 @@
 name: LostCityNavigator
-version: 0.9.3
+version: 1.0.0-beta1
 main: de.lostcity.LostCityNavigator
 api-version: '1.21'
 author: tobimachtdas
