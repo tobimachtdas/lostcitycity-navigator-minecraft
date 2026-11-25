@@ -8,3 +8,15 @@ worlds:
   overworld: ''
   nether: ''
   end: ''
+
+# Conservative in-game scanner; scans generated chunks only.
+# WARNING: Loading old chunks can cause disk I/O and noticeable server lag.
+scanner:
+  default-radius: 1024
+  max-radius: 8192
+  max-chunk-positions: 1100000
+  checks-per-tick: 4
+  max-in-flight: 2
+  cluster-radius: 48
+  min-chests: 3
+  min-city-distance: 1024
