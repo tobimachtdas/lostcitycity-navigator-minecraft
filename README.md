@@ -56,17 +56,18 @@ Auf meinem Kanal kannst du verfolgen, wie ich neue Software-Ideen umsetze. Ich m
 
 ### Direkt im Minecraft-Menü
 
-Mit `/lostcity list` (oder Rechtsklick mit dem Navigator-Kompass) öffnest du das Menü. Als OP erscheinen zusätzlich **„Städte suchen“ (Fernrohr)** und **„Scan-Fortschritt“ (Uhr)**. Der Suchknopf startet den Scan mit dem Standardradius.
+Mit `/lostcity list` (oder Rechtsklick mit dem Navigator-Kompass) öffnest du das Menü. Als OP erscheinen zusätzlich **„Städte suchen“ (Fernrohr)** und **„Scan-Fortschritt“ (Uhr)**. Der Suchknopf durchsucht jetzt **alle auf dem Server gespeicherten Chunks der aktuellen Welt** – nicht nur deine Umgebung.
 
 ### Admin-Befehle
 
-- `/lostcity scan start` – Scan um deine Spielerposition mit Standardradius (1.024 Blöcke) starten
+- `/lostcity scan all` – **gesamte gespeicherte aktuelle Welt** scannen (empfohlen für vergessene Städte)
+- `/lostcity scan start` – alternativ nur im Umkreis deiner Spielerposition suchen (1.024 Blöcke)
 - `/lostcity scan start 2048` – Suchradius in Blöcken selbst angeben
 - `/lostcity scan status` – Fortschritt, geprüfte Chunkpositionen, Truhen und Fehler
 - `/lostcity scan stop` – aktiven Scan abbrechen, ohne unfertige Ergebnisse zu speichern
 - `/lostcity list` – gefundene Orte ansehen; Kompass und Teleport bleiben erhalten
 
-Nur OPs bzw. Spieler mit **`lostcity.scan`** dürfen scannen. Gesucht wird in der aktuellen Welt, nur in bereits generierten Chunks. Es werden keine neuen Landschaften erzeugt.
+Nur OPs bzw. Spieler mit **`lostcity.scan`** dürfen scannen. Für `scan all` liest das Plugin zuerst die Chunk-Positionen aus den `region/r.*.*.mca`-Headern der aktuellen Serverwelt und lädt dann vorhandene Chunks dosiert über Paper. Auch sehr weit entfernte Regionen werden berücksichtigt. Das Plugin erzeugt **keine neuen Weltgebiete**.
 
 ### Suchlogik
 
@@ -77,10 +78,12 @@ Die Ergebnisse werden in `plugins/LostCityNavigator/scanned-locations.json` gesp
 ### Performance und Einschränkungen
 
 - Maximal **4 Chunk-Abfragen pro Tick** und **2 gleichzeitige Chunk-Ladevorgänge** (konfigurierbar).
-- Maximalradius standardmäßig 8.192 Blöcke. Starte mit **512–1.024 Blöcken** und beobachte die Server-TPS.
+- Für die **Umkreissuche** gilt der maximale Radius von 8.192 Blöcken. `scan all` hat stattdessen eine Sicherheitsgrenze von 500.000 bereits gespeicherten Chunks (`scanner.max-indexed-chunks`). Auf großen Welten muss diese Grenze gegebenenfalls vorsichtig angehoben werden.
+- Der weltweite Scan kann sehr lange laufen; **TPS und RAM im Blick behalten**. Für den ersten Test am besten Server-/Weltkopie benutzen.
 - Der Scan kann alte Chunks von der Festplatte nachladen und damit den Server belasten. Für erste Tests eine **Server-/Weltkopie** nutzen.
 - Die Orientierung basiert auf Truhenstandorten. Bereits gefundene Städte ohne große Lager können übersehen werden, natürliche Strukturen können Fehlfunde verursachen.
 - Die Ergebnisse werden als Koordinaten gespeichert, aber die aktuelle Zielwelt-Zuordnung setzt bei mehreren gleichartigen Welten eine passende Einstellung unter `worlds:` voraus.
+- Falls der Scan 0 Truhen oder 0 passende Gruppen meldet, ist das ein echtes Suchergebnis beziehungsweise ein möglicher Lesefehler und wird nun besser durch Chunk-/Fehlerzähler unterscheidbar. Frühere Suchergebnisse werden bei einem leeren neuen Scan nicht gelöscht.
 - Die getestete Hauptversion **0.9.3** ist weiterhin die stabile Ausgangsbasis. Die neue Scanner-Variante muss zuerst per GitHub Actions kompiliert und auf dem Server getestet werden.
 
 ---
