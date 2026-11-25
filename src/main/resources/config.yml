@@ -13,6 +13,8 @@ worlds:
 # WARNING: Loading old chunks can cause disk I/O and noticeable server lag.
 scanner:
   default-radius: 1024
+  # Whole-world scan: maximum indexed on-disk chunks (does not generate new terrain).
+  max-indexed-chunks: 500000
   max-radius: 8192
   max-chunk-positions: 1100000
   checks-per-tick: 4
