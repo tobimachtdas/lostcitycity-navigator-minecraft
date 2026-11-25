@@ -119,6 +119,10 @@ public final class LostCityNavigator extends JavaPlugin implements Listener, Com
     }
 
     private void saveScanFindings(List<ChunkCityScanner.Finding> findings) {
+        if (findings.isEmpty()) {
+            getLogger().warning("Scan found no matching chest clusters; retaining previous scan results.");
+            return;
+        }
         File file = new File(getDataFolder(), "scanned-locations.json");
         JsonObject root = new JsonObject();
         root.addProperty("format", "lostcityfinder");
@@ -188,7 +192,7 @@ public final class LostCityNavigator extends JavaPlugin implements Listener, Com
         inv.setItem(3,icon(Material.ARROW,"§eVorheriges Ziel", "§7Vorherigen Fundort wählen"));
         inv.setItem(4,icon(Material.ARROW,"§eNächstes Ziel", "§7Nächsten Fundort wählen"));
         if(p.hasPermission("lostcity.scan")) {
-            inv.setItem(5,icon(Material.SPYGLASS,"§aStädte suchen", "§7Klicken: Scan starten (Standardradius)", "§7/lostcity scan start [Radius]"));
+            inv.setItem(5,icon(Material.SPYGLASS,"§aStädte suchen", "§7Klicken: gesamte gespeicherte Welt scannen", "§7/lostcity scan all"));
             inv.setItem(6,icon(Material.CLOCK,"§eScan-Fortschritt", "§7Klicken: Status anzeigen", "§7/lostcity scan stop zum Abbrechen"));
         }
         inv.setItem(7,icon(Material.PAPER,"§eVorherige Seite", "§7Seite "+(page+1)+" / "+(maxPage+1)));
@@ -217,7 +221,7 @@ public final class LostCityNavigator extends JavaPlugin implements Listener, Com
             case 5 -> {
                 p.closeInventory();
                 if(p.hasPermission("lostcity.scan"))
-                    scanner.begin(p,p.getWorld(),getConfig().getInt("scanner.default-radius",1024));
+                    scanner.beginAll(p,p.getWorld());
                 return;
             }
             case 6 -> {
@@ -326,10 +330,14 @@ public final class LostCityNavigator extends JavaPlugin implements Listener, Com
         if (args.length > 0 && args[0].equalsIgnoreCase("scan")) {
             if (!sender.hasPermission("lostcity.scan")) { sender.sendMessage("§cKeine Scan-Berechtigung."); return true; }
             if (args.length < 2) {
-                sender.sendMessage("§e/lostcity scan start [Radius] | status | stop"); return true;
+                sender.sendMessage("§e/lostcity scan all | start [Radius] | status | stop"); return true;
             }
             switch (args[1].toLowerCase(Locale.ROOT)) {
                 case "status" -> scanner.status(sender);
+                case "all" -> {
+                    if (sender instanceof Player p) scanner.beginAll(sender, p.getWorld());
+                    else sender.sendMessage("§cScan bitte als Spieler in der gewünschten Welt starten.");
+                }
                 case "stop" -> scanner.stop(sender);
                 case "start" -> {
                     if (!(sender instanceof Player p)) {
@@ -370,7 +378,7 @@ public final class LostCityNavigator extends JavaPlugin implements Listener, Com
         else p.sendMessage("§aNavigator erhalten! Rechtsklick: Ziele · /lostcity map: rechte Übersicht.");
     }
     @Override public List<String> onTabComplete(CommandSender sender,Command cmd,String alias,String[] args) {
-        if(args.length==2 && args[0].equalsIgnoreCase("scan") && sender.hasPermission("lostcity.scan")) return List.of("start","status","stop").stream().filter(x->x.startsWith(args[1].toLowerCase(Locale.ROOT))).toList();
+        if(args.length==2 && args[0].equalsIgnoreCase("scan") && sender.hasPermission("lostcity.scan")) return List.of("all","start","status","stop").stream().filter(x->x.startsWith(args[1].toLowerCase(Locale.ROOT))).toList();
         if(args.length!=1)return List.of();
         List<String> options=new ArrayList<>(List.of("compass","list","map","next","prev","tp"));
         if(sender.hasPermission("lostcity.admin"))options.add("reload");
