@@ -22,6 +22,7 @@ import java.util.*;
 /** Lost City Navigator: private destinations, compass, right sidebar and permission-gated safe teleport. */
 public final class LostCityNavigator extends JavaPlugin implements Listener, CommandExecutor, TabCompleter {
     private record Destination(String id, String name, String dimension, int x, int y, int z, int chests, int score, boolean isPublic) {}
+    private ChunkCityScanner scanner;
     private final List<Destination> locations = new ArrayList<>();
     private final Map<UUID, Destination> active = new HashMap<>();
     private final Map<UUID, Integer> pages = new HashMap<>();
@@ -39,11 +40,13 @@ public final class LostCityNavigator extends JavaPlugin implements Listener, Com
         getServer().getPluginManager().registerEvents(this, this);
         PluginCommand command = Objects.requireNonNull(getCommand("lostcity"));
         command.setExecutor(this); command.setTabCompleter(this);
+        scanner = new ChunkCityScanner(this, this::saveScanFindings);
         reloadDestinations();
         getServer().getScheduler().runTaskTimer(this, this::refreshPlayers, 20L, 40L);
         getLogger().info("Navigator enabled: /lostcity list, /lostcity map, /lostcity tp");
     }
     @Override public void onDisable() {
+        if (scanner != null) scanner.shutdown();
         for (Player p : Bukkit.getOnlinePlayers()) clearSidebar(p);
         sideboards.clear(); active.clear(); pages.clear(); sidebarHidden.clear();
     }
@@ -85,23 +88,69 @@ public final class LostCityNavigator extends JavaPlugin implements Listener, Com
         for (Player p : Bukkit.getOnlinePlayers()) {
             if (MENU.equals(p.getOpenInventory().getTitle())) p.closeInventory();
             for (ItemStack item : p.getInventory().getContents()) if (isNavigator(item) && item.getItemMeta() instanceof CompassMeta meta) {
-                meta.setLodestone(null);item.setItemMeta(meta);
+                meta.setLodestone(null); item.setItemMeta(meta);
             }
         }
-        File file = new File(getDataFolder(), "locations.json");
-        if (!file.isFile()) { getLogger().info("Export locations.json to plugins/LostCityNavigator/"); return; }
+        readDestinations(new File(getDataFolder(), "locations.json"), false);
+        readDestinations(new File(getDataFolder(), "scanned-locations.json"), true);
+        getLogger().info("Loaded " + locations.size() + " destinations (import and scans). Nonpublic remain admin-only.");
+    }
+
+    private void readDestinations(File file, boolean generated) {
+        if (!file.isFile()) {
+            if (!generated) getLogger().info("No imported locations.json yet; in-game scans can create destinations.");
+            return;
+        }
         try (Reader reader = new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8)) {
             JsonObject root = JsonParser.parseReader(reader).getAsJsonObject();
-            if (!"lostcityfinder".equals(root.get("format").getAsString()) || root.get("version").getAsInt()!=1)
+            if (!"lostcityfinder".equals(root.get("format").getAsString()) || root.get("version").getAsInt() != 1)
                 throw new IllegalArgumentException("Unsupported locations format");
             for (JsonElement e : root.getAsJsonArray("locations")) {
                 JsonObject o = e.getAsJsonObject();
-                locations.add(new Destination(o.get("id").getAsString(),o.get("name").getAsString(),o.get("dimension").getAsString(),
-                    o.get("x").getAsInt(),o.get("y").getAsInt(),o.get("z").getAsInt(),o.get("chests").getAsInt(),
-                    o.has("score")?o.get("score").getAsInt():0,o.has("public")&&o.get("public").getAsBoolean()));
+                locations.add(new Destination(o.get("id").getAsString(), o.get("name").getAsString(),
+                    o.get("dimension").getAsString(), o.get("x").getAsInt(), o.get("y").getAsInt(),
+                    o.get("z").getAsInt(), o.has("chests") ? o.get("chests").getAsInt() : 0,
+                    o.has("score") ? o.get("score").getAsInt() : 0,
+                    o.has("public") && o.get("public").getAsBoolean()));
             }
-            getLogger().info("Loaded "+locations.size()+" destinations; nonpublic remain admin-only");
-        } catch (Exception e) { getLogger().severe("Invalid locations.json: "+e.getMessage()); }
+        } catch (Exception ex) {
+            getLogger().severe("Invalid " + file.getName() + ": " + ex.getMessage());
+        }
+    }
+
+    private void saveScanFindings(List<ChunkCityScanner.Finding> findings) {
+        File file = new File(getDataFolder(), "scanned-locations.json");
+        JsonObject root = new JsonObject();
+        root.addProperty("format", "lostcityfinder");
+        root.addProperty("version", 1);
+        JsonArray rows = new JsonArray();
+        int index = 1;
+        for (ChunkCityScanner.Finding f : findings) {
+            JsonObject entry = new JsonObject();
+            entry.addProperty("id", "scan-" + f.worldName() + "-" + f.x() + "-" + f.z());
+            entry.addProperty("name", "Scan-Fundort " + index++);
+            entry.addProperty("dimension", f.dimension());
+            entry.addProperty("x", f.x());
+            entry.addProperty("y", f.y());
+            entry.addProperty("z", f.z());
+            entry.addProperty("chests", f.chests());
+            entry.addProperty("score", f.score());
+            entry.addProperty("public", false);
+            rows.add(entry);
+        }
+        root.add("locations", rows);
+        File temp = new File(getDataFolder(), "scanned-locations.json.tmp");
+        try (Writer writer = new OutputStreamWriter(new FileOutputStream(temp), StandardCharsets.UTF_8)) {
+            new GsonBuilder().setPrettyPrinting().create().toJson(root, writer);
+        } catch (IOException ex) {
+            throw new IllegalStateException("Could not write scan results", ex);
+        }
+        try {
+            java.nio.file.Files.move(temp.toPath(), file.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException ex) {
+            throw new IllegalStateException("Could not replace scan results", ex);
+        }
+        reloadDestinations();
     }
     private boolean isNavigator(ItemStack item) {
         return item!=null && item.getType()==Material.COMPASS && item.hasItemMeta() &&
@@ -138,6 +187,10 @@ public final class LostCityNavigator extends JavaPlugin implements Listener, Com
         inv.setItem(2,icon(Material.FILLED_MAP,"§aRechte Übersicht an/aus", "§7Klicken: Fundorte rechts anzeigen"));
         inv.setItem(3,icon(Material.ARROW,"§eVorheriges Ziel", "§7Vorherigen Fundort wählen"));
         inv.setItem(4,icon(Material.ARROW,"§eNächstes Ziel", "§7Nächsten Fundort wählen"));
+        if(p.hasPermission("lostcity.scan")) {
+            inv.setItem(5,icon(Material.SPYGLASS,"§aStädte suchen", "§7Klicken: Scan starten (Standardradius)", "§7/lostcity scan start [Radius]"));
+            inv.setItem(6,icon(Material.CLOCK,"§eScan-Fortschritt", "§7Klicken: Status anzeigen", "§7/lostcity scan stop zum Abbrechen"));
+        }
         inv.setItem(7,icon(Material.PAPER,"§eVorherige Seite", "§7Seite "+(page+1)+" / "+(maxPage+1)));
         inv.setItem(8,icon(Material.PAPER,"§eNächste Seite", "§7Seite "+(page+1)+" / "+(maxPage+1)));
         for (int i=0;i<PER_PAGE && page*PER_PAGE+i<all.size();i++) {
@@ -161,6 +214,16 @@ public final class LostCityNavigator extends JavaPlugin implements Listener, Com
             case 2 -> {toggleSidebar(p);openMenu(p);return;}
             case 3 -> {shiftTarget(p,-1);openMenu(p);return;}
             case 4 -> {shiftTarget(p,1);openMenu(p);return;}
+            case 5 -> {
+                p.closeInventory();
+                if(p.hasPermission("lostcity.scan"))
+                    scanner.begin(p,p.getWorld(),getConfig().getInt("scanner.default-radius",1024));
+                return;
+            }
+            case 6 -> {
+                if(p.hasPermission("lostcity.scan"))scanner.status(p);
+                return;
+            }
             case 7 -> {openMenu(p,pages.getOrDefault(p.getUniqueId(),0)-1);return;}
             case 8 -> {openMenu(p,pages.getOrDefault(p.getUniqueId(),0)+1);return;}
             default -> {}
@@ -260,6 +323,30 @@ public final class LostCityNavigator extends JavaPlugin implements Listener, Com
         openMenu(event.getPlayer());
     }
     @Override public boolean onCommand(CommandSender sender,Command command,String label,String[] args) {
+        if (args.length > 0 && args[0].equalsIgnoreCase("scan")) {
+            if (!sender.hasPermission("lostcity.scan")) { sender.sendMessage("§cKeine Scan-Berechtigung."); return true; }
+            if (args.length < 2) {
+                sender.sendMessage("§e/lostcity scan start [Radius] | status | stop"); return true;
+            }
+            switch (args[1].toLowerCase(Locale.ROOT)) {
+                case "status" -> scanner.status(sender);
+                case "stop" -> scanner.stop(sender);
+                case "start" -> {
+                    if (!(sender instanceof Player p)) {
+                        sender.sendMessage("§cStarte den Scan als Spieler, damit die Mitte deiner Position entspricht.");
+                        return true;
+                    }
+                    int radius = getConfig().getInt("scanner.default-radius", 1024);
+                    if (args.length > 2) {
+                        try { radius = Integer.parseInt(args[2]); }
+                        catch (NumberFormatException ex) { sender.sendMessage("§cRadius muss eine ganze Zahl sein."); return true; }
+                    }
+                    scanner.begin(sender, p.getWorld(), radius);
+                }
+                default -> sender.sendMessage("§e/lostcity scan start [Radius] | status | stop");
+            }
+            return true;
+        }
         if(args.length>0 && args[0].equalsIgnoreCase("reload")) {
             if(!sender.hasPermission("lostcity.admin")){sender.sendMessage("§cKeine Berechtigung.");return true;}
             reloadDestinations();sender.sendMessage("§aFundorte neu geladen: "+locations.size());return true;
@@ -273,7 +360,7 @@ public final class LostCityNavigator extends JavaPlugin implements Listener, Com
             case "next" -> {shiftTarget(p,1);return true;}
             case "prev" -> {shiftTarget(p,-1);return true;}
             case "compass" -> {giveCompass(p);return true;}
-            default -> {p.sendMessage("§e/lostcity [compass|list|map|next|prev|tp|reload]");return true;}
+            default -> {p.sendMessage("§e/lostcity [compass|list|map|next|prev|tp|reload|scan]");return true;}
         }
         giveCompass(p);return true;
     }
@@ -283,9 +370,11 @@ public final class LostCityNavigator extends JavaPlugin implements Listener, Com
         else p.sendMessage("§aNavigator erhalten! Rechtsklick: Ziele · /lostcity map: rechte Übersicht.");
     }
     @Override public List<String> onTabComplete(CommandSender sender,Command cmd,String alias,String[] args) {
+        if(args.length==2 && args[0].equalsIgnoreCase("scan") && sender.hasPermission("lostcity.scan")) return List.of("start","status","stop").stream().filter(x->x.startsWith(args[1].toLowerCase(Locale.ROOT))).toList();
         if(args.length!=1)return List.of();
         List<String> options=new ArrayList<>(List.of("compass","list","map","next","prev","tp"));
         if(sender.hasPermission("lostcity.admin"))options.add("reload");
+        if(sender.hasPermission("lostcity.scan"))options.add("scan");
         return options.stream().filter(s->s.startsWith(args[0].toLowerCase(Locale.ROOT))).toList();
     }
 }

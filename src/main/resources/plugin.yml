@@ -1,5 +1,5 @@
 name: LostCityNavigator
-version: 0.9.3
+version: 1.0.0-beta1
 main: de.lostcity.LostCityNavigator
 api-version: '1.21'
 author: tobimachtdas
@@ -7,8 +7,8 @@ website: https://www.youtube.com/@tobimachtdas
 description: Lost City Finder compass, right sidebar and permission-gated teleport.
 commands:
   lostcity:
-    description: Navigator, targets, sidebar and teleport
-    usage: /lostcity [compass|list|map|next|prev|tp|reload]
+    description: Navigator, target sidebar, teleport and in-game scanner
+    usage: /lostcity [compass|list|map|next|prev|tp|reload|scan]
 permissions:
   lostcity.use:
     description: Use the navigator and sidebar
@@ -18,4 +18,8 @@ permissions:
     default: op
   lostcity.teleport:
     description: Teleport to an approved selected destination
+    default: op
+
+  lostcity.scan:
+    description: Start, monitor or stop the admin-only in-game search
     default: op
