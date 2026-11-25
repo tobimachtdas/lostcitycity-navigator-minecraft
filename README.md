@@ -54,6 +54,10 @@ Auf meinem Kanal kannst du verfolgen, wie ich neue Software-Ideen umsetze. Ich m
 
 **Städte direkt im Minecraft-Spiel finden – ohne Desktop-Export.** Im Feature-Branch `feature/in-game-chunk-scanner` befindet sich ein erster Server-Scanner zum Testen auf **Paper 1.21.8**. Die Veröffentlichung ist **noch kein nachgewiesen funktionierender Release**.
 
+### Direkt im Minecraft-Menü
+
+Mit `/lostcity list` (oder Rechtsklick mit dem Navigator-Kompass) öffnest du das Menü. Als OP erscheinen zusätzlich **„Städte suchen“ (Fernrohr)** und **„Scan-Fortschritt“ (Uhr)**. Der Suchknopf startet den Scan mit dem Standardradius.
+
 ### Admin-Befehle
 
 - `/lostcity scan start` – Scan um deine Spielerposition mit Standardradius (1.024 Blöcke) starten
