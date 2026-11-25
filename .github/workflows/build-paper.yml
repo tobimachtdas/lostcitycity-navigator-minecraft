@@ -1,6 +1,11 @@
 name: Build Lost City Navigator (Paper 1.21.8)
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - 'pom.xml'
+      - 'src/**'
+      - '.github/workflows/build-paper.yml'
   push:
     paths:
       - 'pom.xml'
