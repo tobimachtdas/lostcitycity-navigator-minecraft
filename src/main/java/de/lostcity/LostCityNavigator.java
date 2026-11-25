@@ -187,6 +187,10 @@ public final class LostCityNavigator extends JavaPlugin implements Listener, Com
         inv.setItem(2,icon(Material.FILLED_MAP,"§aRechte Übersicht an/aus", "§7Klicken: Fundorte rechts anzeigen"));
         inv.setItem(3,icon(Material.ARROW,"§eVorheriges Ziel", "§7Vorherigen Fundort wählen"));
         inv.setItem(4,icon(Material.ARROW,"§eNächstes Ziel", "§7Nächsten Fundort wählen"));
+        if(p.hasPermission("lostcity.scan")) {
+            inv.setItem(5,icon(Material.SPYGLASS,"§aStädte suchen", "§7Klicken: Scan starten (Standardradius)", "§7/lostcity scan start [Radius]"));
+            inv.setItem(6,icon(Material.CLOCK,"§eScan-Fortschritt", "§7Klicken: Status anzeigen", "§7/lostcity scan stop zum Abbrechen"));
+        }
         inv.setItem(7,icon(Material.PAPER,"§eVorherige Seite", "§7Seite "+(page+1)+" / "+(maxPage+1)));
         inv.setItem(8,icon(Material.PAPER,"§eNächste Seite", "§7Seite "+(page+1)+" / "+(maxPage+1)));
         for (int i=0;i<PER_PAGE && page*PER_PAGE+i<all.size();i++) {
@@ -210,6 +214,16 @@ public final class LostCityNavigator extends JavaPlugin implements Listener, Com
             case 2 -> {toggleSidebar(p);openMenu(p);return;}
             case 3 -> {shiftTarget(p,-1);openMenu(p);return;}
             case 4 -> {shiftTarget(p,1);openMenu(p);return;}
+            case 5 -> {
+                p.closeInventory();
+                if(p.hasPermission("lostcity.scan"))
+                    scanner.begin(p,p.getWorld(),getConfig().getInt("scanner.default-radius",1024));
+                return;
+            }
+            case 6 -> {
+                if(p.hasPermission("lostcity.scan"))scanner.status(p);
+                return;
+            }
             case 7 -> {openMenu(p,pages.getOrDefault(p.getUniqueId(),0)-1);return;}
             case 8 -> {openMenu(p,pages.getOrDefault(p.getUniqueId(),0)+1);return;}
             default -> {}
