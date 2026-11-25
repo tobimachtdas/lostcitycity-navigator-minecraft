@@ -235,6 +235,8 @@ final class ChunkCityScanner {
         int minimum = Math.max(1, plugin.getConfig().getInt("scanner.min-chests", 3));
         int minDistance = Math.max(0, plugin.getConfig().getInt("scanner.min-city-distance", 1024));
         List<Finding> findings = cluster(r.points, r.world, clusterRadius, minimum, minDistance);
+        r.sender.sendMessage("§7Scan-Bilanz: §e" + r.loaded + "§7 Chunks geladen, §e" +
+            r.points.size() + "§7 Truhenblöcke, §e" + r.errors + "§7 Lesefehler.");
         try {
             onComplete.accept(findings);
             r.sender.sendMessage("§aScan beendet! §e" + findings.size() + "§a mögliche Fundorte gespeichert. §7/lostcity list");
