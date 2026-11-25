@@ -10,6 +10,13 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
@@ -60,10 +67,97 @@ final class ChunkCityScanner {
         sender.sendMessage("§7/lostcity scan status | /lostcity scan stop");
     }
 
+    /**
+     * Index the location table of existing .mca files off the server thread,
+     * then read candidate chunks through the Paper API with generation disabled.
+     */
+    void beginAll(CommandSender sender, World world) {
+        if (run != null) {
+            sender.sendMessage("§eEs läuft bereits ein Scan. /lostcity scan status");
+            return;
+        }
+        Run task = new Run(sender, world, 0, 0, 0, 0, 0);
+        task.indexing = true;
+        run = task;
+        sender.sendMessage("§aDurchsuche gespeicherte Region-Dateien von §e" + world.getName()
+            + "§a nach vorhandenen Chunks. Das kann bei großen Welten dauern.");
+        Path regionDir = world.getWorldFolder().toPath().resolve("region");
+        int maxChunks = Math.max(1000, plugin.getConfig().getInt("scanner.max-indexed-chunks", 500000));
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                long[] keys = indexRegionHeaders(regionDir, maxChunks);
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (run != task) return;
+                    task.indexing = false;
+                    task.keys = keys;
+                    task.total = keys.length;
+                    if (keys.length == 0) {
+                        run = null;
+                        sender.sendMessage("§cKeine gespeicherten Chunks gefunden. Bitte Weltordner prüfen: "
+                            + regionDir + " (§7auch prüfen, ob du in der richtigen Dimension stehst§c).");
+                        return;
+                    }
+                    task.timer = Bukkit.getScheduler().runTaskTimer(plugin, () -> tick(task), 1L, 1L);
+                    sender.sendMessage("§a" + keys.length + " gespeicherte Chunks gefunden. "
+                        + "Die Suche läuft jetzt über die Paper-API. /lostcity scan status");
+                });
+            } catch (Exception error) {
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    if (run != task) return;
+                    run = null;
+                    plugin.getLogger().warning("World chunk indexing failed: " + error.getMessage());
+                    sender.sendMessage("§cRegionsindex fehlgeschlagen: " + error.getMessage());
+                });
+            }
+        });
+    }
+
+    private static long[] indexRegionHeaders(Path regionDir, int limit) throws IOException {
+        if (!Files.isDirectory(regionDir))
+            throw new IOException("Kein region/-Ordner in " + regionDir);
+        Pattern name = Pattern.compile("r\\.(-?\\d+)\\.(-?\\d+)\\.mca");
+        List<Long> keys = new ArrayList<>();
+        try (Stream<Path> files = Files.list(regionDir)) {
+            for (Path file : files.filter(p -> p.getFileName().toString().endsWith(".mca")).toList()) {
+                Matcher matcher = name.matcher(file.getFileName().toString());
+                if (!matcher.matches()) continue;
+                int regionX = Integer.parseInt(matcher.group(1));
+                int regionZ = Integer.parseInt(matcher.group(2));
+                byte[] header;
+                try (InputStream in = Files.newInputStream(file)) { header = in.readNBytes(4096); }
+                if (header.length != 4096) continue;
+                for (int i = 0; i < 1024; i++) {
+                    int at = i * 4;
+                    int offset = ((header[at] & 255) << 16)
+                        | ((header[at + 1] & 255) << 8) | (header[at + 2] & 255);
+                    int sectors = header[at + 3] & 255;
+                    if (offset < 2 || sectors == 0) continue;
+                    int chunkX = regionX * 32 + (i % 32);
+                    int chunkZ = regionZ * 32 + (i / 32);
+                    keys.add(pack(chunkX, chunkZ));
+                    if (keys.size() >= limit)
+                        throw new IOException("Sicherheitslimit erreicht (" + limit
+                            + " Chunks). In config.yml scanner.max-indexed-chunks erhöhen.");
+                }
+            }
+        }
+        long[] result = new long[keys.size()];
+        for (int i = 0; i < keys.size(); i++) result[i] = keys.get(i);
+        return result;
+    }
+
+    private static long pack(int x, int z) {
+        return ((long)x << 32) | (z & 0xffffffffL);
+    }
+
     void status(CommandSender sender) {
         Run r = run;
         if (r == null) { sender.sendMessage("§eKein Scan aktiv."); return; }
-        double pct = r.total == 0 ? 100 : 100.0 * (r.processed + r.inFlight) / r.total;
+        if (r.indexing) {
+            sender.sendMessage("§eRegionsdateien werden indiziert. Bitte kurz später den Scanstatus abrufen.");
+            return;
+        }
+        double pct = r.total == 0 ? 0 : 100.0 * (r.processed + r.inFlight) / r.total;
         sender.sendMessage(String.format(Locale.ROOT,
             "§aScan: §e%s §7%.1f%% §8| §7%d/%d geprüft §8| §7%d geladene Chunks §8| §7%d Truhenblöcke §8| §7%d ausstehend",
             r.world.getName(), pct, r.processed, r.total, r.loaded, r.points.size(), r.inFlight));
@@ -88,11 +182,18 @@ final class ChunkCityScanner {
         int batch = Math.max(1, Math.min(32, plugin.getConfig().getInt("scanner.checks-per-tick", 4)));
         int parallel = Math.max(1, Math.min(8, plugin.getConfig().getInt("scanner.max-in-flight", 2)));
         for (int n = 0; n < batch && r.hasNext() && r.inFlight < parallel; n++) {
-            int cx = r.nextX, cz = r.nextZ;
-            r.advance();
+            int cx, cz;
+            if (r.keys != null) {
+                long position = r.keys[r.cursor++];
+                cx = (int)(position >> 32);
+                cz = (int)position;
+            } else {
+                cx = r.nextX;
+                cz = r.nextZ;
+                r.advance();
+            }
             // isChunkGenerated is a Paper/Bukkit world query performed only on the main thread.
-            if (!r.world.isChunkGenerated(cx, cz)) { r.processed++; continue; }
-            boolean wasLoaded = r.world.isChunkLoaded(cx, cz);
+            if (r.keys == null && !r.world.isChunkGenerated(cx, cz)) { r.processed++; continue; }
             r.inFlight++;
             CompletableFuture<Chunk> future;
             try {
@@ -210,17 +311,19 @@ final class ChunkCityScanner {
         final CommandSender sender;
         final World world;
         final int minX,maxX,minZ,maxZ;
-        final long total;
+        long total;
         final List<ChestPoint> points=new ArrayList<>();
         BukkitTask timer;
-        int nextX,nextZ,inFlight,loaded,errors;
+        int nextX,nextZ,inFlight,loaded,errors,cursor;
+        long[] keys;
+        boolean indexing;
         long processed;
         boolean truncated;
         Run(CommandSender sender,World world,int minX,int maxX,int minZ,int maxZ,long total){
             this.sender=sender;this.world=world;this.minX=minX;this.maxX=maxX;this.minZ=minZ;this.maxZ=maxZ;
             this.nextX=minX;this.nextZ=minZ;this.total=total;
         }
-        boolean hasNext(){return nextZ<=maxZ;}
+        boolean hasNext(){return keys != null ? cursor < keys.length : nextZ<=maxZ;}
         void advance(){if(++nextX>maxX){nextX=minX;nextZ++;}}
     }
 }
